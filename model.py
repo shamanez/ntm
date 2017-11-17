@@ -23,10 +23,10 @@ class NTMCopyModel():
                                     addressing_mode='content_and_location',
                                     reuse=reuse,
                                     output_dim=args.vector_dim)
-
-        state = cell.zero_state(args.batch_size, tf.float32)
+ 
+        state = cell.zero_state(args.batch_size, tf.float32) #This is like the initialized state 
         self.state_list = [state] #this is the zero state 
-        for t in range(seq_length):
+        for t in range(seq_length): #for each time step we send these things 
             output, state = cell(tf.concat([self.x[:, t, :], np.zeros([args.batch_size, 1])], axis=1), state) #feeding forward throug the RNN 
             self.state_list.append(state)
         output, state = cell(eof, state) #last state 
@@ -35,7 +35,7 @@ class NTMCopyModel():
 #this is the decoder
         self.o = [] #outpts at each time steps should save here 
         for t in range(seq_length): #output at each time step 
-            output, state = cell(zero, state)
+            output, state = cell(zero, state) #here in the decoder there is no input to feed 
             self.o.append(output[:, 0:args.vector_dim])
             self.state_list.append(state) #also keep the hidden state of the decorder 
         self.o = tf.sigmoid(tf.transpose(self.o, perm=[1, 0, 2])) #getting the sigmoid since they should give binary values
