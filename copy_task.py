@@ -18,7 +18,7 @@ def main():
     parser.add_argument('--memory_size', default=128)
     parser.add_argument('--memory_vector_dim', default=20)
     parser.add_argument('--batch_size', default=10)
-    parser.add_argument('--vector_dim', default=8)
+    parser.add_argument('--vector_dim', default=8) #binary 8 bit vector  
     parser.add_argument('--shift_range', default=1)
     parser.add_argument('--num_epoches', default=1000000)
     parser.add_argument('--learning_rate', default=1e-4)
@@ -33,7 +33,7 @@ def main():
 
 def train(args):
     model_list = [NTMCopyModel(args, 1)]
-    for seq_length in range(2, args.max_seq_length + 1):
+    for seq_length in range(2, args.max_seq_length + 1):  #increasing the sequnce length 
         model_list.append(NTMCopyModel(args, seq_length, reuse=True))
     # model = NTM_model(args, args.max_seq_length)
     with tf.Session() as sess:
