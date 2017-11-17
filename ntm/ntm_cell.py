@@ -16,7 +16,7 @@ class NTMCell():  #this is the class for the NTM cell . Same as LSTM cell but wi
         self.output_dim = output_dim
         self.shift_range = shift_range
 
-    def __call__(self, x, prev_state):
+    def __call__(self, x, prev_state): #we put the data in the previous state and first the input 
         prev_read_vector_list = prev_state['read_vector_list']      # read vector in Sec 3.1 (the content that is
                                                                     # read out, length = memory_vector_dim)
         prev_controller_state = prev_state['controller_state']      # state of controller (LSTM hidden state)
@@ -54,7 +54,7 @@ class NTMCell():  #this is the class for the NTM cell . Same as LSTM cell but wi
         w_list = [] 
         p_list = []
         for i, head_parameter in enumerate(head_parameter_list): #read right head weights 
-
+#here the same read and wright weight heads are distributed between read and write vector parts 
             # Some functions to constrain the result in specific range
             # exp(x)                -> x > 0
             # sigmoid(x)            -> x \in (0, 1)
@@ -77,27 +77,27 @@ class NTMCell():  #this is the class for the NTM cell . Same as LSTM cell but wi
 
         read_w_list = w_list[:self.read_head_num]
         read_vector_list = []
-        for i in range(self.read_head_num):
-            read_vector = tf.reduce_sum(tf.expand_dims(read_w_list[i], dim=2) * prev_M, axis=1)
-            read_vector_list.append(read_vector)
+        for i in range(self.read_head_num):#we have one read head
+            read_vector = tf.reduce_sum(tf.expand_dims(read_w_list[i], dim=2) * prev_M, axis=1) #get the read head 
+            read_vector_list.append(read_vector)  #only one read vector 
 
         # Writing (Sec 3.2)
 
         write_w_list = w_list[self.read_head_num:]
         M = prev_M
-        for i in range(self.write_head_num):
+        for i in range(self.write_head_num): #updating the memory vector  #only one head 
             w = tf.expand_dims(write_w_list[i], axis=2)
-            erase_vector = tf.expand_dims(tf.sigmoid(erase_add_list[i * 2]), axis=1)
-            add_vector = tf.expand_dims(tf.tanh(erase_add_list[i * 2 + 1]), axis=1)
-            M = M * (tf.ones(M.get_shape()) - tf.matmul(w, erase_vector)) + tf.matmul(w, add_vector)
+            erase_vector = tf.expand_dims(tf.sigmoid(erase_add_list[i * 2]), axis=1) #get the erase vector inbetween 0 and 1
+            add_vector = tf.expand_dims(tf.tanh(erase_add_list[i * 2 + 1]), axis=1) #write vector between -1 and + 1 
+            M = M * (tf.ones(M.get_shape()) - tf.matmul(w, erase_vector)) + tf.matmul(w, add_vector) #update the memory vector 
 
         # controller_output -> NTM output
 
         if not self.output_dim:
-            output_dim = x.get_shape()[1]
+            output_dim = x.get_shape()[1]  #input shape at one time step 
         else:
             output_dim = self.output_dim
-        with tf.variable_scope("o2o", reuse=(self.step > 0) or self.reuse):
+        with tf.variable_scope("o2o", reuse=(self.step > 0) or self.reuse):    
             o2o_w = tf.get_variable('o2o_w', [controller_output.get_shape()[1], output_dim],
                                     initializer=tf.random_normal_initializer(mean=0.0, stddev=0.5))
             o2o_b = tf.get_variable('o2o_b', [output_dim],
@@ -105,11 +105,11 @@ class NTMCell():  #this is the class for the NTM cell . Same as LSTM cell but wi
             NTM_output = tf.nn.xw_plus_b(controller_output, o2o_w, o2o_b)
 
         state = {
-            'controller_state': controller_state,
-            'read_vector_list': read_vector_list,
-            'w_list': w_list,
-            'p_list': p_list,
-            'M': M
+            'controller_state': controller_state, 
+            'read_vector_list': read_vector_list, #this has the sum of the read vector list in the section 3.1 
+            'w_list': w_list, #this has the normalized weight list 
+            'p_list': p_list, #paramter list got updated 
+            'M': M  #memory vector got updated 
         }
 
         self.step += 1
