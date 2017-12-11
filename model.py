@@ -2,11 +2,12 @@ import tensorflow as tf
 import numpy as np
 
 
-class NTMCopyModel():
+class NTMCopyModel(): #this is basically making the encorder and the decorder. 
     def __init__(self, args, seq_length, reuse=False):
         self.x = tf.placeholder(name='x', dtype=tf.float32, shape=[args.batch_size, seq_length, args.vector_dim]) #input placeh
         self.y = self.x #output placeholder here this is 3 dimentional 
-        eof = np.zeros([args.batch_size, args.vector_dim + 1]) #print and understand about the vector
+        eof = np.zeros([args.batch_size, args.vector_dim + 1]) #this is end of sequence 
+
         eof[:, args.vector_dim] = np.ones([args.batch_size])
         eof = tf.constant(eof, dtype=tf.float32)
         zero = tf.constant(np.zeros([args.batch_size, args.vector_dim + 1]), dtype=tf.float32)
@@ -17,33 +18,36 @@ class NTMCopyModel():
             def rnn_cell(rnn_size):
                 return tf.nn.rnn_cell.BasicLSTMCell(rnn_size, reuse=reuse) #rnn cell structure
             cell = tf.nn.rnn_cell.MultiRNNCell([rnn_cell(args.rnn_size) for _ in range(args.rnn_num_layers)]) #multi layer rnn
-        elif args.model == 'NTM':
+        elif args.model == 'NTM':     #This cell is a neural machine translation cell. Which can output a controller output(LSTM cell) then 
             import ntm.ntm_cell as ntm_cell
-            cell = ntm_cell.NTMCell(args.rnn_size, args.memory_size, args.memory_vector_dim, 1, 1,
+            cell = ntm_cell.NTMCell(args.rnn_size, args.memory_size, args.memory_vector_dim, 1, 1,   #output a cell object
                                     addressing_mode='content_and_location',
                                     reuse=reuse,
                                     output_dim=args.vector_dim)
- 
-        state = cell.zero_state(args.batch_size, tf.float32) #This is like the initialized state 
+
+#this is like the encoder 
+        state = cell.zero_state(args.batch_size, tf.float32) #This is like the initialized state which contains a dictionalY of controller state , memmory vecotr , read head and write head
         self.state_list = [state] #this is the zero state 
         for t in range(seq_length): #for each time step we send these things 
             output, state = cell(tf.concat([self.x[:, t, :], np.zeros([args.batch_size, 1])], axis=1), state) #feeding forward throug the RNN 
             self.state_list.append(state)
         output, state = cell(eof, state) #last state 
-        self.state_list.append(state) #each hidden state is added in to a lost 
+        self.state_list.append(state) 
 
 #this is the decoder
         self.o = [] #outpts at each time steps should save here 
         for t in range(seq_length): #output at each time step 
+
             output, state = cell(zero, state) #here in the decoder there is no input to feed 
+
             self.o.append(output[:, 0:args.vector_dim])
             self.state_list.append(state) #also keep the hidden state of the decorder 
-        self.o = tf.sigmoid(tf.transpose(self.o, perm=[1, 0, 2])) #getting the sigmoid since they should give binary values
-
+        self.o = tf.sigmoid(tf.transpose(self.o, perm=[1, 0, 2])) #getting the sigmoid since they should give binary values  #binary output at each time teps are stored this is 8 bit
+        
         # self.copy_loss = tf.reduce_mean(tf.reduce_sum(tf.square(self.y - self.o), reduction_indices=[1, 2]))
         eps = 1e-8
         self.copy_loss = -tf.reduce_mean(   # cross entropy function
-            self.y * tf.log(self.o + eps) + (1 - self.y) * tf.log(1 - self.o + eps) #the loss is logistic log loss 
+            self.y * tf.log(self.o + eps) + (1 - self.y) * tf.log(1 - self.o + eps) #the loss is logistic log loss element wise loss
         )
         with tf.variable_scope('optimizer', reuse=reuse):
             self.optimizer = tf.train.RMSPropOptimizer(learning_rate=args.learning_rate, momentum=0.9, decay=0.95) #optimizing 
