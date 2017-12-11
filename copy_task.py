@@ -10,14 +10,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', default="train")
     parser.add_argument('--restore_training', default=False)
-    parser.add_argument('--test_seq_length', type=int, default=20)
+    parser.add_argument('--test_seq_length', type=int, default=2)
     parser.add_argument('--model', default="NTM")
     parser.add_argument('--rnn_size', default=128)
     parser.add_argument('--rnn_num_layers', default=3)
-    parser.add_argument('--max_seq_length', default=15)
-    parser.add_argument('--memory_size', default=128)
-    parser.add_argument('--memory_vector_dim', default=20)
-    parser.add_argument('--batch_size', default=10)
+    parser.add_argument('--max_seq_length', default=2)
+    parser.add_argument('--memory_size', default=128) #this is how many memory locations 
+    parser.add_argument('--memory_vector_dim', default=25)
+    parser.add_argument('--batch_size', default=5)
     parser.add_argument('--vector_dim', default=8) #binary 8 bit vector  
     parser.add_argument('--shift_range', default=1)
     parser.add_argument('--num_epoches', default=1000000)
@@ -34,8 +34,12 @@ def main():
 def train(args):
     model_list = [NTMCopyModel(args, 1)]
     for seq_length in range(2, args.max_seq_length + 1):  #increasing the sequnce length 
-        model_list.append(NTMCopyModel(args, seq_length, reuse=True))
+      
+        model_list.append(NTMCopyModel(args, seq_length, reuse=True)) #for each sequence this will create the model and the optimizer 
+
     # model = NTM_model(args, args.max_seq_length)
+
+
     with tf.Session() as sess:
         if args.restore_training:
             saver = tf.train.Saver()
@@ -50,8 +54,10 @@ def train(args):
         for b in range(args.num_epoches):
             seq_length = np.random.randint(1, args.max_seq_length + 1)
             model = model_list[seq_length - 1]
+            print("printing the seq leangth",seq_length)
             # seq_length = args.max_seq_length
             x = generate_random_strings(args.batch_size, seq_length, args.vector_dim)
+    
             feed_dict = {model.x: x}
             # print(sess.run([model.state_list, model.output_list], feed_dict=feed_dict))
             if b % 100 == 0:        # test
@@ -98,4 +104,5 @@ def test(args):
             plt.show()
 
 if __name__ == '__main__':
+    print("xsxsxsxs")
     main()
