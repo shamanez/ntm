@@ -176,7 +176,7 @@ class NTMCell():  #this is the class for the NTM cell . Same as LSTM cell but wi
     def zero_state(self, batch_size, dtype):
         def expand(x, dim, N): #N is the batch size
             return tf.concat([tf.expand_dims(x, dim) for _ in range(N)], axis=dim)
-
+#with variables this can help to find better initialization to the zero state. As in the RNN 
         with tf.variable_scope('init', reuse=self.reuse):
 
             state = {            #state is a tupple 
