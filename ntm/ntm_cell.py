@@ -62,8 +62,8 @@ class NTMCell():  #this is the class for the NTM cell . Same as LSTM cell but wi
 
         prev_w_list = prev_state['w_list']  # vector of weightings (blurred address) initialized softmax  scores for each memory location we use this for the interpolation 
         prev_M = prev_state['M'] #previous memory matrix 
-        w_list = [] 
-        p_list = []
+        w_list = [] #weight list
+        p_list = [] #paramter list 
   
         for i, head_parameter in enumerate(head_parameter_list): #read right head weights  #this is interating only two times one for the read and one for the write params 
 #here the same read and wright weight heads are distributed between read and write vector parts 
