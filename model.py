@@ -32,7 +32,7 @@ class NTMCopyModel(): #this is basically making the encorder and the decorder.
             output, state = cell(tf.concat([self.x[:, t, :], np.zeros([args.batch_size, 1])], axis=1), state) #feeding forward throug the RNN 
             self.state_list.append(state)
         output, state = cell(eof, state) #last state 
-        self.state_list.append(state) 
+        self.state_list.append(state) #state is a big dictiory . Each time step we keep it  
 
 #this is the decoder
         self.o = [] #outpts at each time steps should save here 
@@ -54,7 +54,7 @@ class NTMCopyModel(): #this is basically making the encorder and the decorder.
             gvs = self.optimizer.compute_gradients(self.copy_loss)
             capped_gvs = [(tf.clip_by_value(grad, -10., 10.), var) for grad, var in gvs]  #need to clip gradients because normaly 
             self.train_op = self.optimizer.apply_gradients(capped_gvs)
-        self.copy_loss_summary = tf.summary.scalar('copy_loss_%d' % seq_length, self.copy_loss)
+        self.copy_loss_summary = tf.summary.scalar('copy_loss_%d' % seq_length, self.copy_loss) #for different sequence length
         # self.merged_summary = tf.summary.merge(self.copy_loss_summary)
 
 
@@ -65,7 +65,7 @@ class NTMOneShotLearningModel():
         elif args.label_type == 'five_hot':
             args.output_dim = 25
 
-        self.x_image = tf.placeholder(dtype=tf.float32,
+        self.x_image = tf.placeholder(dtype=tf.float32,           
                                       shape=[args.batch_size, args.seq_length, args.image_width * args.image_height])
         self.x_label = tf.placeholder(dtype=tf.float32,
                                       shape=[args.batch_size, args.seq_length, args.output_dim])
@@ -83,41 +83,42 @@ class NTMOneShotLearningModel():
                                     write_head_num=args.write_head_num,
                                     addressing_mode='content_and_location',
                                     output_dim=args.output_dim)
-        elif args.model == 'MANN':
-            import ntm.mann_cell as mann_cell
-            cell = mann_cell.MANNCell(args.rnn_size, args.memory_size, args.memory_vector_dim,
+        elif args.model == 'MANN':       #this is the standard MANN cell
+            import ntm.mann_cell as mann_cell  #here no seperate write heads
+            cell = mann_cell.MANNCell(args.rnn_size, args.memory_size, args.memory_vector_dim,  #initalizing the memory cell.
                                     head_num=args.read_head_num)
         elif args.model == 'MANN2':
             import ntm.mann_cell_2 as mann_cell
             cell = mann_cell.MANNCell(args.rnn_size, args.memory_size, args.memory_vector_dim,
                                     head_num=args.read_head_num)
-
-        state = cell.zero_state(args.batch_size, tf.float32)
-        self.state_list = [state]   # For debugging
-        self.o = []
-        for t in range(args.seq_length):
-            output, state = cell(tf.concat([self.x_image[:, t, :], self.x_label[:, t, :]], axis=1), state)
+        
+        state = cell.zero_state(args.batch_size, tf.float32) #Get the zero state or initialize the state
+        self.state_list = [state]   # For debugging keep the zero state
+        self.o = [] #for the output
+        for t in range(args.seq_length): #till the end of the sequence 
+        #here the x label should be time shifted, one step shifted 
+            output, state = cell(tf.concat([self.x_image[:, t, :], self.x_label[:, t, :]], axis=1), state) #call function in the MANN cell. get the output and the state dictionar
             # output, state = cell(self.y[:, t, :], state)
-            with tf.variable_scope("o2o", reuse=(t > 0)):
+            with tf.variable_scope("o2o", reuse=(t > 0)): #sending the output via a fully connected to get real output
                 o2o_w = tf.get_variable('o2o_w', [output.get_shape()[1], args.output_dim],
                                         initializer=tf.random_uniform_initializer(minval=-0.1, maxval=0.1))
                                         # initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
                 o2o_b = tf.get_variable('o2o_b', [args.output_dim],
                                         initializer=tf.random_uniform_initializer(minval=-0.1, maxval=0.1))
                                         # initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
-                output = tf.nn.xw_plus_b(output, o2o_w, o2o_b)
+                output = tf.nn.xw_plus_b(output, o2o_w, o2o_b)  #output is the cell output for each time step them we use fully connectd layers
             if args.label_type == 'one_hot':
-                output = tf.nn.softmax(output, dim=1)
+                output = tf.nn.softmax(output, dim=1) #softmax 
             elif args.label_type == 'five_hot':
                 output = tf.stack([tf.nn.softmax(o) for o in tf.split(output, 5, axis=1)], axis=1)
-            self.o.append(output)
-            self.state_list.append(state)
+            self.o.append(output) #stacking the outputs
+            self.state_list.append(state) #keeping the states in the state list
         self.o = tf.stack(self.o, axis=1)
-        self.state_list.append(state)
+        self.state_list.append(state) #get the final state and stack it
 
         eps = 1e-8
         if args.label_type == 'one_hot':
-            self.learning_loss = -tf.reduce_mean(  # cross entropy function
+                        self.learning_loss = -tf.reduce_mean(  # cross entropy function
                 tf.reduce_sum(self.y * tf.log(self.o + eps), axis=[1, 2])
             )
         elif args.label_type == 'five_hot':
@@ -128,11 +129,11 @@ class NTMOneShotLearningModel():
         self.learning_loss_summary = tf.summary.scalar('learning_loss', self.learning_loss)
 
         with tf.variable_scope('optimizer'):
-            self.optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate)
+            self.optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate) #optimizing the loss
             # self.optimizer = tf.train.RMSPropOptimizer(
             #     learning_rate=args.learning_rate, momentum=0.9, decay=0.95
             # )
             # gvs = self.optimizer.compute_gradients(self.learning_loss)
             # capped_gvs = [(tf.clip_by_value(grad, -10., 10.), var) for grad, var in gvs]
             # self.train_op = self.optimizer.apply_gradients(gvs)
-            self.train_op = self.optimizer.minimize(self.learning_loss)
+            self.train_op = self.optimizer.minimize(self.learning_loss) #optimizing the loss 
