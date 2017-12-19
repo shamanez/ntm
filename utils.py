@@ -37,10 +37,13 @@ def baseN(num,b):
 
 class OmniglotDataLoader:
     def __init__(self, data_dir='./data', image_size=(20, 20), n_train_classses=1200, n_test_classes=423):
+
         self.data = []
         self.image_size = image_size
         for dirname, subdirname, filelist in os.walk(data_dir):
+
             if filelist:
+                
                 self.data.append(
                     # [np.reshape(
                     #     np.array(Image.open(dirname + '/' + filename).resize(image_size), dtype=np.float32),
@@ -50,8 +53,9 @@ class OmniglotDataLoader:
                     # [io.imread(dirname + '/' + filename).astype(np.float32) / 255 for filename in filelist]
                     [Image.open(dirname + '/' + filename).copy() for filename in filelist]
                 )
-
+#number of all the classes in 963 
         self.train_data = self.data[:n_train_classses]
+
         self.test_data = self.data[-n_test_classes:]
 
     def fetch_batch(self, n_classes, batch_size, seq_length,
